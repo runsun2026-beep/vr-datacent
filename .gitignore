@@ -1,34 +1,29 @@
-# Python
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Test / coverage
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Build artifacts
+# Virtual environments and build output
+.venv/
+venv/
+env/
 build/
 dist/
 *.egg-info/
 
-# Local configuration
+# Local configuration and runtime database files
 .env
 .env.*
 !.env.example
-
-# SQLite runtime data
+data/
 *.db
 *.sqlite
 *.sqlite3
 
-# Blender temporary files
+# Blender backup files
 *.blend1
 *.blend2
 *.blend@

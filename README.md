@@ -26,11 +26,23 @@ tests/         Automated tests, mirroring the backend layout
 
 ## Roadmap
 
-1. Project skeleton (current)
-2. Mock database: data center, room, rack, and device
+1. Project skeleton (complete)
+2. Mock database: data center, room, rack, and device (complete)
 3. Blender rack generation
 4. Device placement and data-driven status visualization
 5. Selection, editing, fault injection, and refresh workflows
 6. Integration with real asset and telemetry sources
 
 See [docs/architecture.md](docs/architecture.md) for ownership boundaries and the future data contract.
+
+## Run the Sprint 2 mock interface
+
+No third-party dependencies are required. From the repository root:
+
+```bash
+python3 -m backend.api.mock_api
+python3 -m unittest discover -s tests -v
+```
+
+The first command creates `data/dcverse_mock.sqlite3` locally and prints the stable JSON
+contract that Blender will consume in Sprint 3. The database is intentionally ignored by Git.
