@@ -1,1 +1,0 @@
-"""DCVerse backend package."""
