@@ -46,3 +46,15 @@ python3 -m unittest discover -s tests -v
 
 The first command creates `data/dcverse_mock.sqlite3` locally and prints the stable JSON
 contract that Blender will consume in Sprint 3. The database is intentionally ignored by Git.
+
+## Run the Sprint 3 Blender generator
+
+First export the mock data to a JSON file:
+
+```bash
+python3 -m backend.api.mock_api > /tmp/dcverse-devices.json
+```
+
+In Blender, open `blender/scripts/create_datacenter.py`, set `JSON_PATH` to the absolute
+path of that file, then select **Run Script**. The script creates a `DCVerse_Scene` collection
+containing one 42U rack per JSON rack and places each device according to its U position.

@@ -13,4 +13,6 @@ The initial visualization contract will be JSON and will remain stable when the 
 }
 ```
 
-This is a target contract only; validation and persistence arrive in the mock database sprint.
+Sprint 2 now exports a list of these records with additional, optional detail fields including
+`rack_total_u`, `u_height`, asset, IP, CPU, memory, GPU, and power data. Sprint 3 uses
+`rack_total_u`, `u_position`, and `u_height` to generate the physical rack layout.
