@@ -96,6 +96,9 @@ def material(name: str, color: tuple[float, float, float, float], emission: floa
 
 FRAME_MATERIAL = None
 LABEL_MATERIAL = None
+GLASS_MATERIAL = None
+DETAIL_MATERIAL = None
+FAN_MATERIAL = None
 
 
 def add_box(collection: bpy.types.Collection, name: str, location: tuple[float, float, float], dimensions: tuple[float, float, float], mat: bpy.types.Material) -> bpy.types.Object:
@@ -104,6 +107,17 @@ def add_box(collection: bpy.types.Collection, name: str, location: tuple[float, 
     obj.name = name
     obj.dimensions = dimensions
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    obj.data.materials.append(mat)
+    for linked_collection in list(obj.users_collection):
+        linked_collection.objects.unlink(obj)
+    collection.objects.link(obj)
+    return obj
+
+
+def add_cylinder(collection: bpy.types.Collection, name: str, location: tuple[float, float, float], radius: float, depth: float, mat: bpy.types.Material, rotation: tuple[float, float, float] = (0, 0, 0)) -> bpy.types.Object:
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=radius, depth=depth, location=location, rotation=rotation)
+    obj = bpy.context.object
+    obj.name = name
     obj.data.materials.append(mat)
     for linked_collection in list(obj.users_collection):
         linked_collection.objects.unlink(obj)
@@ -136,14 +150,40 @@ def build_rack(collection: bpy.types.Collection, room: str, rack: str, total_u: 
     for unit in range(total_u + 1):
         z = unit * RACK_U_HEIGHT
         add_box(collection, f"{room}_{rack}_u_{unit}", (x, -RACK_DEPTH / 2, z), (RACK_WIDTH, 0.012, 0.003), FRAME_MATERIAL)
+    # A framed, blue-tinted front glass door makes the rack readable as an enclosure.
+    add_box(collection, f"{room}_{rack}_glass_door", (x, -RACK_DEPTH / 2 - 0.018, bottom), (RACK_WIDTH * 0.86, 0.010, height * 0.94), GLASS_MATERIAL)
+    for side in (-1, 1):
+        add_box(collection, f"{room}_{rack}_door_frame_{side}", (x + side * RACK_WIDTH * 0.45, -RACK_DEPTH / 2 - 0.025, bottom), (0.018, 0.025, height * 0.97), FRAME_MATERIAL)
+    for fan_x in (-RACK_WIDTH * 0.22, RACK_WIDTH * 0.22):
+        add_cylinder(collection, f"{room}_{rack}_top_fan_{fan_x:+.2f}", (x + fan_x, 0, height + 0.035), 0.075, 0.025, FAN_MATERIAL)
     add_text(collection, rack, (x, -RACK_DEPTH / 2 - 0.03, height + 0.07), 0.07, f"{room}_{rack}_label")
+
+
+def build_device_details(collection: bpy.types.Collection, device: dict, rack_x: float, z: float, height: float) -> None:
+    """Add a distinct front panel for GPU, CPU, and network devices."""
+    hostname = device["hostname"]
+    front_y = -RACK_DEPTH * 0.46 - 0.008
+    device_type = device["device_type"].lower()
+    if "switch" in device_type:
+        for index in range(12):
+            port_x = rack_x - 0.22 + index * 0.04
+            add_box(collection, f"{hostname}_port_{index + 1}", (port_x, front_y, z), (0.025, 0.012, min(0.018, height * 0.45)), material("DCVerse_port", (0.06, 0.35, 0.65, 1.0), 0.08))
+    else:
+        fan_count = 4 if "gpu" in device_type else 3
+        for index in range(fan_count):
+            fan_x = rack_x - 0.18 + index * (0.36 / max(1, fan_count - 1))
+            add_cylinder(collection, f"{hostname}_fan_{index + 1}", (fan_x, front_y, z), min(0.028, height * 0.30), 0.014, FAN_MATERIAL, (1.5708, 0, 0))
+    label = "GPU SERVER" if "gpu" in device_type else "CPU SERVER" if "cpu" in device_type else device["device_type"].upper()
+    add_text(collection, label, (rack_x - 0.08, front_y - 0.010, z), min(0.035, height * 0.40), f"{hostname}_type_label")
 
 
 def build_device(collection: bpy.types.Collection, device: dict, rack_x: float) -> None:
     height = device["u_height"] * RACK_U_HEIGHT * 0.88
     z = (device["u_position"] - 1) * RACK_U_HEIGHT + height / 2
     status = device["status"].lower()
-    device_material = material(f"DCVerse_{status}", STATUS_COLORS.get(status, (0.35, 0.35, 0.35, 1.0)), 0.15)
+    device_type = device["device_type"].lower()
+    chassis_color = (0.06, 0.10, 0.16, 1.0) if "gpu" in device_type else (0.16, 0.17, 0.19, 1.0) if "cpu" in device_type else (0.04, 0.05, 0.06, 1.0)
+    device_material = material(f"DCVerse_chassis_{device_type}", chassis_color)
     hostname = device["hostname"]
     obj = add_box(collection, hostname, (rack_x, 0, z), (RACK_WIDTH * 0.90, RACK_DEPTH * 0.90, height), device_material)
     obj["dcverse_device"] = True
@@ -151,14 +191,26 @@ def build_device(collection: bpy.types.Collection, device: dict, rack_x: float) 
         # Blender custom properties do not support JSON null; omit absent values.
         if value is not None:
             obj[key] = value
+    led_color = STATUS_COLORS.get(status, (0.35, 0.35, 0.35, 1.0))
+    add_box(collection, f"{hostname}_status_led", (rack_x + RACK_WIDTH * 0.35, -RACK_DEPTH * 0.46 - 0.010, z), (0.026, 0.012, min(0.022, height * 0.5)), material(f"DCVerse_led_{status}", led_color, 3.0))
+    build_device_details(collection, device, rack_x, z, height)
     add_text(collection, hostname, (rack_x, -RACK_DEPTH / 2 - 0.025, z), 0.045, f"{hostname}_label")
 
 
 def build_scene(devices: list[dict]) -> None:
-    global FRAME_MATERIAL, LABEL_MATERIAL
+    global FRAME_MATERIAL, LABEL_MATERIAL, GLASS_MATERIAL, DETAIL_MATERIAL, FAN_MATERIAL
     collection = clear_previous_scene()
     FRAME_MATERIAL = material("DCVerse_frame", (0.05, 0.06, 0.08, 1.0))
     LABEL_MATERIAL = material("DCVerse_labels", (0.85, 0.90, 1.00, 1.0), 0.05)
+    DETAIL_MATERIAL = material("DCVerse_detail", (0.015, 0.02, 0.03, 1.0))
+    FAN_MATERIAL = material("DCVerse_fan", (0.11, 0.13, 0.16, 1.0), 0.04)
+    GLASS_MATERIAL = material("DCVerse_glass", (0.07, 0.25, 0.40, 0.20))
+    glass_principled = GLASS_MATERIAL.node_tree.nodes.get("Principled BSDF")
+    alpha = glass_principled.inputs.get("Alpha")
+    if alpha:
+        alpha.default_value = 0.20
+    if hasattr(GLASS_MATERIAL, "surface_render_method"):
+        GLASS_MATERIAL.surface_render_method = "DITHERED"
     grouped: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
     for device in devices:
         grouped[device["room"]][device["rack"]].append(device)
@@ -173,6 +225,7 @@ def build_scene(devices: list[dict]) -> None:
             x += RACK_WIDTH + RACK_GAP
         add_text(collection, room, ((room_start + x - RACK_GAP) / 2, -0.75, 2.1), 0.12, f"{room}_label")
         x += ROOM_GAP
+    add_box(collection, "DCVerse_floor", ((x - ROOM_GAP) / 2, 0, -0.04), (max(3.0, x), 2.8, 0.05), material("DCVerse_floor", (0.025, 0.03, 0.04, 1.0)))
     bpy.context.scene["dcverse_source"] = str(source_path())
     print(f"DCVerse: created {len(grouped)} room(s) and {len(devices)} device(s).")
 
