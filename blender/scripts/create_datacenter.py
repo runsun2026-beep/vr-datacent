@@ -31,6 +31,68 @@ STATUS_COLORS = {
 }
 
 
+class DCVERSE_PT_device_inspector(bpy.types.Panel):
+    """Show backend-supplied inventory for the selected device."""
+
+    bl_idname = "DCVERSE_PT_device_inspector"
+    bl_label = "DCVerse Device Inspector"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "DCVerse"
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context) -> bool:
+        selected = context.active_object
+        return selected is not None and bool(selected.get("dcverse_device"))
+
+    def draw(self, context: bpy.types.Context) -> None:
+        device = context.active_object
+        layout = self.layout
+        layout.label(text=str(device.get("hostname", device.name)))
+        layout.separator()
+
+        placement = layout.box()
+        placement.label(text="Placement")
+        placement.label(text=f"Room: {device.get('room', '—')}")
+        placement.label(text=f"Rack: {device.get('rack', '—')}")
+        placement.label(text=f"U position: {device.get('u_position', '—')} ({device.get('u_height', '—')}U)")
+
+        identity = layout.box()
+        identity.label(text="Asset")
+        identity.label(text=f"Type: {device.get('device_type', '—')}")
+        identity.label(text=f"Status: {str(device.get('status', 'unknown')).upper()}")
+        identity.label(text=f"Serial number: {device.get('serial_number', '—')}")
+        identity.label(text=f"Asset tag: {device.get('asset_tag', '—')}")
+
+        network = layout.box()
+        network.label(text="Network")
+        network.label(text=f"Management IP: {device.get('management_ip', '—')}")
+        network.label(text=f"Business IP: {device.get('business_ip', '—')}")
+
+        configuration = layout.box()
+        configuration.label(text="Configuration")
+        configuration.label(text=f"CPU: {device.get('cpu_model', '—')}")
+        memory = device.get("memory_gb")
+        configuration.label(text=f"Memory: {str(memory) + ' GB' if memory is not None else '—'}")
+        gpu_count = device.get("gpu_count")
+        configuration.label(text=f"GPU count: {gpu_count if gpu_count is not None else '—'}")
+        power = device.get("power_watts")
+        configuration.label(text=f"Power: {str(power) + ' W' if power is not None else '—'}")
+
+
+INSPECTOR_CLASSES = (DCVERSE_PT_device_inspector,)
+
+
+def register_inspector() -> None:
+    """Register safely when this Text Editor script is run more than once."""
+    for panel_class in INSPECTOR_CLASSES:
+        try:
+            bpy.utils.unregister_class(panel_class)
+        except RuntimeError:
+            pass
+        bpy.utils.register_class(panel_class)
+
+
 def script_arguments() -> argparse.Namespace:
     """Read only arguments placed after Blender's `--` separator."""
     parser = argparse.ArgumentParser(add_help=False)
@@ -231,6 +293,7 @@ def build_scene(devices: list[dict]) -> None:
 
 
 def main() -> None:
+    register_inspector()
     build_scene(load_devices(source_path()))
     output = script_arguments().blend_output
     if output:

@@ -30,7 +30,7 @@ tests/         Automated tests, mirroring the backend layout
 2. Mock database: data center, room, rack, and device (complete)
 3. Blender rack generation
 4. Device placement and data-driven status visualization
-5. Selection, editing, fault injection, and refresh workflows
+5. Device selection and asset inspection (complete); editing, fault injection, and refresh workflows follow
 6. Integration with real asset and telemetry sources
 
 See [docs/architecture.md](docs/architecture.md) for ownership boundaries and the future data contract.
@@ -58,3 +58,14 @@ python3 -m backend.api.mock_api > /tmp/dcverse-devices.json
 In Blender, open `blender/scripts/create_datacenter.py`, set `JSON_PATH` to the absolute
 path of that file, then select **Run Script**. The script creates a `DCVerse_Scene` collection
 containing one 42U rack per JSON rack and places each device according to its U position.
+
+## Run the Sprint 5 device inspector
+
+Run the same generator as Sprint 3/4. In Blender's 3D Viewport, click a server or switch,
+then press **N** to open the right sidebar and choose the **DCVerse** tab. The **DCVerse Device
+Inspector** shows its placement, serial number, asset tag, management/business IP, CPU, memory,
+GPU count, power, and status from the JSON object stored on the selected Blender object.
+
+The inspector is display-only: Blender has not yet been given database write operations. That
+separation is intentional; create, update, delete, fault injection, and scene refresh belong to
+the following Sprint 5 sub-tasks and will call the backend rather than make Blender authoritative.
